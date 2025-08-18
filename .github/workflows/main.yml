@@ -15,7 +15,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: test
@@ -34,7 +34,7 @@ jobs:
             pip install -e .
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full git history is needed to get a proper list of changed files within `super-linter`
           fetch-depth: 0
