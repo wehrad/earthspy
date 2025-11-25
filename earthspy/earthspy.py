@@ -27,9 +27,9 @@ from rasterio.merge import merge
 
 
 class EarthSpy:
-    """Monitor and study any place on Earth and in Near Real-Time
+    """
+    Monitor and study any place on Earth and in Near Real-Time
     (NRT) using the SentinelHub services.
-
     """
 
     def __init__(self, CLIENT_credentials_file: str) -> None:
