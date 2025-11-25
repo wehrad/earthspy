@@ -76,7 +76,6 @@ class EarthSpy:
         time_interval: Union[int, tuple],
         data_collection: str,
         evaluation_script: Union[None, str] = None,
-        algorithm: Union[None, str] = None,
         resolution: Union[None, int] = None,
         store_folder: Union[None, str] = None,
         multithreading: bool = True,
@@ -101,11 +100,6 @@ class EarthSpy:
           URL to a custom script on https://custom-scripts.sentinel-hub.com/. If
           not specified, a default script is used.
         :type evaluation_script: str
-
-        :param algorithm: Name of the algorithm to apply (some algorithms
-          would require a large number of variables to be set by the user, we
-          therefore decided to encapsule them).
-        :type algorithm: Union[None, str], optional
 
         :param data_collection: Data collection name. Check
           shb.DataCollection.get_available_collections() for a list of all
@@ -157,7 +151,6 @@ class EarthSpy:
         self.multithreading = multithreading
         self.verbose = verbose
         self.remove_splitboxes = remove_splitboxes
-        self.algorithm = algorithm
 
         # set query attributes
         self.data_collection_str = data_collection
@@ -228,10 +221,7 @@ class EarthSpy:
         """
 
         # set Sentinel Hub data collection object
-        if self.algorithm == "SICE":
-            self.data_collection = shb.DataCollection.SENTINEL3_OLCI
-        else:
-            self.data_collection = shb.DataCollection[self.data_collection_str]
+        self.data_collection = shb.DataCollection[self.data_collection_str]
 
         return self.data_collection
 
@@ -257,6 +247,7 @@ class EarthSpy:
         # some data sets require a difference service_url, test search_iterator
         # and update service_url if download failed
         try:
+            print(self.catalog_config.sh_base_url)
             # store metadata of available scenes
             self.metadata = {}
             for iterator in search_iterator:
@@ -265,6 +256,9 @@ class EarthSpy:
                     date = iterator_list[0]["properties"]["datetime"].split("T")[0]
                     self.metadata[date] = iterator_list
 
+            print("I'm here")
+
+        # if True:
         except shb.exceptions.DownloadFailedException:
             # set specific base URL of deployment
             self.catalog_config.sh_base_url = shb.DataCollection[
@@ -291,6 +285,8 @@ class EarthSpy:
                 if len(iterator_list) > 0:
                     date = iterator_list[0]["properties"]["datetime"].split("T")[0]
                     self.metadata[date] = iterator_list
+
+            print("not there")
 
         # create date +-1 hour around acquisition time
         time_difference = timedelta(hours=1)
@@ -498,9 +494,6 @@ class EarthSpy:
             # set earthspy folder as default sub store folder
             if self.bounding_box_name:
                 store_folder += f"{os.sep}{self.bounding_box_name}"
-
-            if self.algorithm:
-                store_folder += f"{os.sep}{self.algorithm}"
 
         # create subfolder if doesn't exist
         if not os.path.exists(store_folder):
@@ -817,7 +810,10 @@ class EarthSpy:
                 shb.SentinelHubRequest.input_data(
                     data_collection=self.data_collection,
                     time_interval=(date_string, date_string),
-                    other_args={"processing": {"orthorectify": True}},
+                    other_args={
+                        "processingBaselineXXX": "0205",
+                        "processing": {"orthorectify": True},  # optional
+                    },
                 )
             ],
             responses=[
@@ -827,46 +823,7 @@ class EarthSpy:
             size=loc_size,
             config=self.config,
         )
-
-        if self.algorithm == "SICE":
-            self.response_files = [
-                "r_TOA_01",
-                "r_TOA_06",
-                "r_TOA_17",
-                "r_TOA_21",
-                "snow_grain_diameter",
-                "snow_specific_surface_area",
-                "diagnostic_retrieval",
-                "albedo_bb_planar_sw",
-                "albedo_bb_spherical_sw",
-            ]
-
-            shb_request = shb.SentinelHubRequest(
-                data_folder=self.store_folder,
-                evalscript=self.evaluation_script,
-                input_data=[
-                    shb.SentinelHubRequest.input_data(
-                        data_collection=shb.DataCollection.DEM_COPERNICUS_30,
-                        identifier="COP_30",
-                        upsampling="NEAREST",
-                        downsampling="NEAREST",
-                    ),
-                    shb.SentinelHubRequest.input_data(
-                        data_collection=shb.DataCollection.SENTINEL3_OLCI,
-                        identifier="OLCI",
-                        time_interval=(date_string, date_string),
-                        upsampling="NEAREST",
-                        downsampling="NEAREST",
-                    ),
-                ],
-                responses=[
-                    shb.SentinelHubRequest.output_response(rf, shb.MimeType.TIFF)
-                    for rf in self.response_files
-                ],
-                bbox=loc_bbox,
-                size=loc_size,
-                config=self.config,
-            )
+        print("using O205 baseline")
 
         return shb_request
 
@@ -941,10 +898,6 @@ class EarthSpy:
         # get raw folders created by Sentinel Hub API
         folders = [f"{self.store_folder}/{fn}" for fn in self.raw_folder_names]
 
-        # extract outputs stored in archives
-        if self.algorithm == "SICE":
-            self.extract_sentinelhub_responses(folders)
-
         # store new file names
         self.output_filenames = []
 
@@ -959,35 +912,12 @@ class EarthSpy:
             # extract date of acquisition
             date = list(request_tree.execute("$..timeRange"))[0]["from"].split("T")[0]
 
-            # if SICE, store files in date subfolders if multiple outputs
-            if self.algorithm == "SICE":
-                # build folder name
-                date_folder = f"{self.store_folder}/{date}"
-
-                # create folder if doesn't exist
-                if not os.path.exists(date_folder):
-                    os.makedirs(date_folder)
-
-                # list all output files available for date
-                date_files = sorted(glob.glob(f"{folder}/*.tif"))
-
             # if D download mode, set file name using date and data collection
             if self.download_mode == "D":
                 # build new file name
                 new_filename = (
                     f"{self.store_folder}/" + "{date}_{self.data_collection_str}.tif"
                 )
-
-                # If SICE, don't rename file but move to date folder
-                if self.algorithm == "SICE":
-                    for f in date_files:
-                        # include date in path
-                        os.rename(
-                            f, f"{self.store_folder}/{date}/{f.split(os.sep)[-1]}"
-                        )
-
-                        # store output file name
-                        self.output_filenames.append(f)
 
             # if SM download mode, set file name using date, data collection and box id
             elif self.download_mode == "SM":
@@ -1007,26 +937,6 @@ class EarthSpy:
                     f"{self.store_folder}/"
                     + f"{date}_{self.data_collection_str}_{split_box_id}.tif"
                 )
-
-                # if SICE, add split box id in all names and move to date folder
-                if self.algorithm == "SICE":
-                    for f in date_files:
-                        # extract absolute path
-                        absolute_file_name = f.split(os.sep)[-1]
-                        new_absolute_file_name = absolute_file_name.replace(
-                            ".tif", f"_{split_box_id}.tif"
-                        )
-
-                        # include date in path
-                        new_full_file_name = (
-                            f"{self.store_folder}/{date}/{new_absolute_file_name}"
-                        )
-
-                        # rename file
-                        os.rename(f, new_full_file_name)
-
-                        # store output file name
-                        self.output_filenames.append(new_full_file_name)
 
             # rename file using new file name
             if os.path.exists(f"{folder}/response.tiff"):
@@ -1048,11 +958,8 @@ class EarthSpy:
         the different rasters have been merged.
         """
 
-        # extract dates from file or folder names (depending on algorithm)
-        if self.algorithm == "SICE":
-            dates = [f.split(os.sep)[-2] for f in self.output_filenames]
-        else:
-            dates = [f.split(os.sep)[-1].split("_")[0] for f in self.output_filenames]
+        # extract dates from file
+        dates = [f.split(os.sep)[-1].split("_")[0] for f in self.output_filenames]
 
         # get distinct dates because several split boxes a day
         distinct_dates = list(Counter(dates).keys())
@@ -1060,19 +967,13 @@ class EarthSpy:
         # store new file names
         self.output_filenames_renamed = []
 
-        # merge rasters for each distinct date (work with distinct dates because
-        # of different trees depending on the algorithm used)
+        # merge rasters for each distinct date
         for date in distinct_dates:
             # select files matching acquisition date only
             date_output_files = [f for f in self.output_filenames if date in f]
 
-            # loop over response files if multiple ones (they all need to be
-            # merged, but only to their respective boxes)
-            if self.algorithm == "SICE":
-                file_iterator = self.response_files
-            else:
-                # set to tif to select all files (but keep a general file_iterator)
-                file_iterator = ["tif"]
+            # set to tif to select all files (but keep a general file_iterator)
+            file_iterator = ["tif"]
 
             for pattern in file_iterator:
                 date_response_files = [f for f in date_output_files if pattern in f]
