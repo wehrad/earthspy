@@ -250,7 +250,6 @@ class EarthSpy:
         # some data sets require a difference service_url, test search_iterator
         # and update service_url if download failed
         try:
-            print(self.catalog_config.sh_base_url)
             # store metadata of available scenes
             self.metadata = {}
             for iterator in search_iterator:
@@ -258,8 +257,6 @@ class EarthSpy:
                 if len(iterator_list) > 0:
                     date = iterator_list[0]["properties"]["datetime"].split("T")[0]
                     self.metadata[date] = iterator_list
-
-            print("I'm here")
 
         # if True:
         except shb.exceptions.DownloadFailedException:
@@ -288,8 +285,6 @@ class EarthSpy:
                 if len(iterator_list) > 0:
                     date = iterator_list[0]["properties"]["datetime"].split("T")[0]
                     self.metadata[date] = iterator_list
-
-            print("not there")
 
         # create date +-1 hour around acquisition time
         time_difference = timedelta(hours=1)
@@ -826,7 +821,6 @@ class EarthSpy:
             size=loc_size,
             config=self.config,
         )
-        print("using O205 baseline")
 
         return shb_request
 
