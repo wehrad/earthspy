@@ -258,7 +258,6 @@ class EarthSpy:
                     date = iterator_list[0]["properties"]["datetime"].split("T")[0]
                     self.metadata[date] = iterator_list
 
-        # if True:
         except shb.exceptions.DownloadFailedException:
             # set specific base URL of deployment
             self.catalog_config.sh_base_url = shb.DataCollection[
