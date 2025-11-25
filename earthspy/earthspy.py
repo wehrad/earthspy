@@ -808,7 +808,7 @@ class EarthSpy:
                     data_collection=self.data_collection,
                     time_interval=(date_string, date_string),
                     other_args={
-                        "processing": {"orthorectify": True},  # optional
+                        "processing": {"orthorectify": True},
                     },
                 )
             ],
