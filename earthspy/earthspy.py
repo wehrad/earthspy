@@ -51,10 +51,13 @@ class EarthSpy:
         self.configure_connection()
 
     def configure_connection(self) -> shb.SHConfig:
-        """Build a shb configuration class for the connection to Sentinel Hub services.
+        """
+        Build a shb configuration class for the connection to
+        Sentinel Hub services.
 
         :return: sentinelhub-py package configuration class.
         :rtype: shb.SHConfig
+
         """
 
         # setup Sentinel Hub connection
